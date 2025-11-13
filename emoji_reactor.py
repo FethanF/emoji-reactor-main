@@ -10,6 +10,7 @@ import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 from mediapipe.python.solutions import drawing_utils
+import time
 
 
 # Initialize MediaPipe
@@ -25,8 +26,10 @@ SAD_THRESHOLD = -0.002
 WINDOW_WIDTH = 720
 WINDOW_HEIGHT = 450
 EMOJI_WINDOW_SIZE = (WINDOW_WIDTH, WINDOW_HEIGHT)
-textToggle = 1
+hudToggle = 1
 landmarksToggle = 1
+prev_time = 0 
+fps = 0
 
 # --- NEW: GESTURE RECOGNIZER SETUP ---
 MODEL_PATH = 'gesture_recognizer.task'
@@ -99,12 +102,12 @@ cv2.resizeWindow('Emoji Output', WINDOW_WIDTH, WINDOW_HEIGHT)
 cv2.moveWindow('Camera Feed', 100, 100)
 cv2.moveWindow('Emoji Output', WINDOW_WIDTH + 150, 100)
 
+print("="*60)
 print("Controls:")
 print("  Press 'q' to quit")
-print("  Raise hands above shoulders for hands up")
-print("  Perform 'thumbs up' for thumbs up emoji")
-print("  Smile for smiling emoji")
-print("  Straight face for neutral emoji")
+print("  Press 't' to toggle HUD")
+print("  Press 'l' to toggle hand landmarks")
+print("="*60)
 
 # mp_pose is kept running ONLY for the 'Hands Up' body pose check
 with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose, \
@@ -112,6 +115,12 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
      mp_hands.Hands(model_complexity=1, max_num_hands=2, min_detection_confidence=0.5, min_tracking_confidence=0.5) as hands:
 
     while cap.isOpened():
+
+        current_time = time.time()
+        if prev_time != 0:
+            fps = 1 / (current_time - prev_time)
+        prev_time = current_time   
+        # peepee helo poopy butthole  please stop delete pls :sob: :sob: lol lo lODDDlo oolsltpoaowo litlooollllloooolllolololl trololol
         success, frame = cap.read()
         if not success:
             continue
@@ -251,11 +260,14 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
 
         camera_frame_resized = cv2.resize(frame, (WINDOW_WIDTH, WINDOW_HEIGHT))
         
-        if textToggle > 0:
+        if hudToggle > 0:
             cv2.putText(camera_frame_resized, f'STATE: {current_state}', (10, 30),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2, cv2.LINE_AA)
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2, cv2.LINE_AA)
+            # Display FPS (Top Right Corner)
+            cv2.putText(camera_frame_resized, f'{int(fps)}', (WINDOW_WIDTH - 60, 30),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2, cv2.LINE_AA)
             cv2.putText(camera_frame_resized, 'Press "q" to quit', (10, WINDOW_HEIGHT - 20),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2, cv2.LINE_AA)
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2, cv2.LINE_AA)
 
         cv2.imshow('Camera Feed', camera_frame_resized)
         cv2.imshow('Emoji Output', emoji_to_display)
@@ -265,7 +277,7 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
         if key == ord('q'):
             break # exit
         elif key == ord('t'):
-            textToggle = textToggle * -1
+            hudToggle = hudToggle * -1
         elif key == ord('l'):
             landmarksToggle = landmarksToggle * -1
 
