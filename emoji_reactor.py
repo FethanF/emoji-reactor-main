@@ -17,15 +17,16 @@ mp_pose = mp.solutions.pose
 mp_face_mesh = mp.solutions.face_mesh
 mp_drawing = mp.solutions.drawing_utils
 mp_hands = mp.solutions.hands
-mp_drawing_styles = mp.solutions.drawing_styles
+mp_styles = mp.solutions.drawing_styles
 
 # Configuration
 SMILE_THRESHOLD = 0.0155
-SAD_THRESHOLD = -0.001
+SAD_THRESHOLD = -0.002
 WINDOW_WIDTH = 720
 WINDOW_HEIGHT = 450
 EMOJI_WINDOW_SIZE = (WINDOW_WIDTH, WINDOW_HEIGHT)
 textToggle = 1
+landmarksToggle = 1
 
 # --- NEW: GESTURE RECOGNIZER SETUP ---
 MODEL_PATH = 'gesture_recognizer.task'
@@ -108,7 +109,7 @@ print("  Straight face for neutral emoji")
 # mp_pose is kept running ONLY for the 'Hands Up' body pose check
 with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose, \
      mp_face_mesh.FaceMesh(max_num_faces=1, min_detection_confidence=0.5) as face_mesh, \
-     mp_hands.Hands(model_complexity=0, min_detection_confidence=0.5, min_tracking_confidence=0.5) as hands:
+     mp_hands.Hands(model_complexity=1, max_num_hands=2, min_detection_confidence=0.5, min_tracking_confidence=0.5) as hands:
 
     while cap.isOpened():
         success, frame = cap.read()
@@ -127,23 +128,48 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
         body_pose = pose.process(image_rgb)
 
         # --- 0. DRAW HAND LANDMARKS ---
-        try:
-            results = hands.process(image_rgb)
-            image_rgb.flags.writeable = True
+        if landmarksToggle > 0:
+            try:
+                results = hands.process(image_rgb)
+                image_rgb.flags.writeable = True
+                all_landmark_coords = []
+                current_hand_coords = {}
+                all_connections = []
+                h, w, _ = frame.shape
 
-            if results.multi_hand_landmarks:
-                for hand_landmarks in results.multi_hand_landmarks:
-                    mp_drawing.draw_landmarks(
-                        frame,
-                        hand_landmarks,
-                        mp_hands.HAND_CONNECTIONS,
-                        mp_drawing_styles.get_default_hand_landmarks_style(),
-                        mp_drawing_styles.get_default_hand_connections_style())
+                if results.multi_hand_landmarks:
+                    for hand_landmarks in results.multi_hand_landmarks:
+                        # Get image size
+                        h, w, _ = frame.shape
+                        # Collect landmark pixel coordinates
+                        coords = {}
+                        for i, lm in enumerate(hand_landmarks.landmark):
+                            if 0 <= lm.x <= 1 and 0 <= lm.y <= 1:
+                                # Store coordinates and add to the master list for circles
+                                px = int(lm.x * w)
+                                py = int(lm.y * h)
+                                current_hand_coords[i] = (px, py)
+                                all_landmark_coords.append((px, py))
 
-            
-        except Exception as e:
-            print("Error: Failed to draw pose:", e)
-            traceback.print_exc()
+                        # Collect connections for the CURRENT hand and add to master list
+                        for connection in mp_hands.HAND_CONNECTIONS:
+                            start_idx, end_idx = connection
+                            if start_idx in current_hand_coords and end_idx in current_hand_coords:
+                                all_connections.append((current_hand_coords[start_idx], current_hand_coords[end_idx]))
+
+                    # Draw red connection lines for ALL hands
+                for start_point, end_point in all_connections:
+                    cv2.line(frame, start_point, end_point, (0, 0, 255), 2) # Red connections
+
+                # Draw red dots for ALL landmarks (no white outlines)
+                for (cx, cy) in all_landmark_coords:
+                    cv2.circle(frame, (cx, cy), 3, (0, 0, 255), -1) # Red filled circles
+
+
+                
+            except Exception as e:
+                print("Error: Failed to draw pose:", e)
+                traceback.print_exc()
 
 
         # --- 1. CHECK FOR THUMBS UP (USING NEW MODEL) ---
@@ -240,6 +266,8 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
             break # exit
         elif key == ord('t'):
             textToggle = textToggle * -1
+        elif key == ord('l'):
+            landmarksToggle = landmarksToggle * -1
 
 cap.release()
 cv2.destroyAllWindows()
