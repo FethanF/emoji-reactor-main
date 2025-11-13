@@ -111,7 +111,6 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
      mp_hands.Hands(model_complexity=0, min_detection_confidence=0.5, min_tracking_confidence=0.5) as hands:
 
     while cap.isOpened():
-        # random comment
         success, frame = cap.read()
         if not success:
             continue
